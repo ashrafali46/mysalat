@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+ <meta charset="UTF-8">
+ <link rel="stylesheet" href="static/css/jquery-ui.css">
+<link rel="stylesheet" href="static/css/main.css">
+<link rel="stylesheet" href="static/css/leaflet.css" />
+
+<script src="settings.js"></script>
+<script src="static/js/jquery-2.1.1.min.js"></script>
+<script src="static/js/jquery-ui.js"></script>
+<script src="static/js/datepicker-ar.js"></script>
+<script src="static/js/leaflet.js"></script>
+<script src="static/js/jquery.validate.js"></script>
+<script src="static/js/additional-methods.js"></script>
+<!-- <script src="static/js/PrayTimes.js"></script> -->
+<script src="static/js/PrayTimes-v2.3.js"></script>
+<script src="static/js/FileSaver.js"></script>
+<script src="static/js/geo.js"></script>
+<script>
+//todo:write the settings in the cookies
+
+douaaperiodms = settings.douaaperiod*60*1000;
+var skipaudiotime = '';
+function startDouaa() {
+    if(settings.douaaperiod>0){
+	playsound('douaa',settings.douaavolume, 0);
+	setTimeout(startDouaa, douaaperiodms);
+    }
+}
+var m = -1;   
+function startTime() {
+    var today = new Date();
+    var h = today.getHours();
+    m = today.getMinutes();
+    var s = today.getSeconds();
+    h = checkTime(h);
+    m = checkTime(m);
+    s = checkTime(s);
+    //$('#currenttime').html(h + ":" + m + ":" + s);
+    var salattime = [$('#sdq').html(),$('#dhr').html(),$('#asr').html(),$('#mgrb').html(),$('#icha').html()];
+	//alert(salattime);
+    var cur = h + ":" + m;
+
+    for(i=0;i<salattime.length;i++){
+            if(salattime[i]== cur){
+                    /*var w;
+                    if(typeof(Worker) !== "undefined") {
+                            if(typeof(w) == "undefined") {
+                                    w = new Worker("static/js/playathan.js");
+                            }
+
+                    } else {
+                            playathan();
+                    }*/
+
+                    playsound('athan',settings.athanvolume, 0);
+                    break;
+            }
+    }
+    for(i=0;i<settings.alarms.length;i++){
+            if(settings.alarms[i][0]== cur){
+                dayss = settings.alarms[i][1].split('-');
+                for(var j in dayss){
+                    if(today.getDay()==dayss[j]){
+                        playsound('alarm',settings.alarmvolume, i);
+
+                        break;
+                    }
+                }
+            }
+    }
+    if(settings.athkarsabah == cur || ("0"+settings.athkarsabah) == cur){
+        playsound('sabah',settings.douaavolume, 0);
+    }
+    if(settings.athkarmasaa == cur || ("0"+settings.athkarmasaa) == cur){
+        playsound('masaa',settings.douaavolume, 0);
+    }
+    if(skipaudiotime!='' && skipaudiotime != m){
+       skipaudiotime=''; 
+    }
+    var t = setTimeout(startTime, 500);
+
+}
+var audio = null;
+var playing = false;
+douaaIndex = 0;
+
+function playsound(type, volume, alarmid){
+	if(audio ==null || audio.ended){
+		playing = false;
+	}
+	if(!playing && skipaudiotime != m){
+		playing = true;
+		switch(type){
+			case 'athan':
+				audio = new Audio('static/sounds/athan.mp3');
+				break;
+			case 'sabah':
+				audio = new Audio('static/sounds/athkar_sabah.mp3');
+                                $('#alarmalert').html(' أذكار الصباح ');
+                                $("#alarmalert").show();
+				break;
+			case 'masaa':
+				audio = new Audio('static/sounds/athkar_masaa.mp3');
+                                $('#alarmalert').html(' أذكار المساء ');
+                                $("#alarmalert").show();
+				break;
+			case 'alarm':
+				audio = new Audio('static/sounds/rooster_alarm.mp3');
+                                $('#alarmalert').html('تنبيه '+settings.alarms[alarmid][2]+' :'+ settings.alarms[alarmid][0]+' ');
+                                $("#alarmalert").show();
+				break;
+			case 'douaa':
+			
+				index = douaaIndex%settings.nbdouaas;
+				douaaIndex++;
+				audio = new Audio('static/sounds/douaa'+index+'.mp3');
+				break;
+		}
+                
+		audio.volume = volume;
+		audio.play();
+                
+	}
+	
+}
+function setCookie(cname, cvalue, exdays) {
+    var d = new Date();
+    d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+    var expires = "expires="+d.toUTCString();
+    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function getCookie(cname) {
+    var name = cname + "=";
+    var ca = document.cookie.split(';');
+    for(var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') {
+            c = c.substring(1);
+        }
+        if (c.indexOf(name) == 0) {
+            
+            return c.substring(name.length, c.length);
+        }
+    }
+    return "";
+}
+
+function checkTime(i) {
+    if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+    return i;
+}
+var nbalarms = 0;
+arabicdays=['الأحد','الأثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function deletealarm(i){
+    $('#alarmstableentry'+i).remove();
+    settings.alarms[i] = null;
+    cookietext = '';
+    for(i=0;i<settings.alarms.length;i++){
+        if(settings.alarms[i]!== null)
+        cookietext += settings.alarms[i][0]+','+settings.alarms[i][1]+','+settings.alarms[i][2]+"|";
+    }
+    setCookie('alarms', cookietext, 365);
+}
+function addalarm(){
+    newalarm = [];
+    newalarm[0] = $('#newalarmtime').val();
+    daysa = '';
+    daysstext='';
+    $('.newalarmday').each(function(i, obj) {
+        if(document.getElementById($(this).attr('id')).checked){
+           daysa +=  $(this).val()+'-';
+           daysstext += arabicdays[$(this).val()]+' ';
+        }
+    });
+    newalarm[1] = daysa;
+    newalarm[2] = $('#newalarmname').val();    
+    settings.alarms[nbalarms] = newalarm;    
+    textToInsert = '<tr id="alarmstableentry'+nbalarms+'"><td>'+settings.alarms[nbalarms][0]+'</td><td>'+daysstext+'</td><td>'+settings.alarms[nbalarms][2]+'</td><td><span onclick="deletealarm('+nbalarms+')">احذف المنبه</span></td></tr>';
+    $("#alarmstable tr:last").after(textToInsert);
+    
+    cookietext = '';
+    for(i=0;i<settings.alarms.length;i++){
+        if(settings.alarms[i]!== null)
+        cookietext += settings.alarms[i][0]+','+settings.alarms[i][1]+','+settings.alarms[i][2]+"|";
+    }
+    setCookie('alarms', cookietext, 365);
+    
+    nbalarms++;
+    return false;
+}
+$(window).ready(function(){
+    var settingsform = $( "#settingsform" );
+    settingsform.validate({
+          
+        rules: {
+                athkarsabah: {
+                        required:true,
+                        time: true
+                },
+                athkarmasaa: {
+                        required:true,
+                        time: true
+                },
+                lat: {
+                        required:true,
+                        number: true
+                },
+                lon: {
+                        required:true,
+                        number: true
+                },
+                douaaperiod: {
+                        required:true,
+                        integer: true
+                }
+        },
+        messages: {
+
+                athkarsabah: "أكتب وقت صحيح",
+                athkarmasaa: "أكتب وقت صحيح",
+                lat: "أكتب عدد صحيح",
+                lon: "أكتب عدد صحيح",
+                douaaperiod: "أكتب عدد الدقائق"
+        }
+});
+
+   $("#newalarmsubmit").on("click", function () {
+       addalarm();
+       return false;
+   });
+   $(".settingsvalue").on("change", function () {
+       if(settingsform.valid()){
+       settingsv = null;
+       if($(this).attr('id')=='alarms'){
+           
+           /*v = $(this).val().replace(/\r/g, "");           
+           v = v.replace(/\n/g, "|");
+           
+           setCookie($(this).attr('id'), v, 365);
+           settingsv = [];
+           alarmss = v.split('|');
+            for(i=0;i<alarmss.length;i++){
+                alarmsst = alarmss[i].split(',');
+                settingsv[i] = [];
+                settingsv[i][0] = alarmsst[0];
+                settingsv[i][1] = alarmsst[1];
+            }
+            */
+       }else{
+           setCookie($(this).attr('id'), $(this).val(), 365);
+           settingsv = $(this).val();
+       }
+       settings[$(this).attr('id')] = settingsv;
+       if($(this).attr('id')=='AthanCalMethod' || $(this).attr('id')=='lat' || $(this).attr('id')=='lon'){
+           prayTimes.setMethod(settings.AthanCalMethod);
+           slat();
+       }
+   }
+   });
+    $("#stopsound").on("click", function () {
+           audio.pause();
+           audio.currentTime = 0;
+           skipaudiotime = m;
+           playing = false;
+        });
+    $("#alarmalert").on("click", function () {
+           /*audio.pause();
+           audio.currentTime = 0;
+           skipaudiotime = m;
+           playing = false;*/
+           $("#alarmalert").hide();
+        });
+	
+
+        for(var s in settings){
+            if(getCookie(s) != ""){
+                v = getCookie(s);
+                if(s=='alarms'){
+                    alarmss = v.split('|');
+                    v = [];
+                    j = 0;
+                    for(i=0;i<alarmss.length;i++){
+                        alarmsst = alarmss[i].split(',');
+                        if(alarmsst[0]!==undefined && alarmsst[0]!==''){
+                            v[j] = [];
+                            v[j][0] = alarmsst[0];
+                            v[j][1] = alarmsst[1];
+                            v[j][2] = alarmsst[2];
+                            j++;
+                    }
+                    }
+                }
+                settings[s] = v;
+            }
+            switch(s){
+                case 'alarms':
+                case 'AthanCalMethod':
+                    
+                    break;
+                default:
+                    $('#'+s).val(settings[s]);
+                    break;
+            }
+            
+           
+        }
+        //$('#douaaperiod').val(settings.douaaperiod);
+        //$('#athkarsabah').val(settings.athkarsabah);
+        //$('#athkarmasaa').val(settings.athkarmasaa);
+        //$('#lat').val(settings.lat);
+        //$('#lon').val(settings.lon);
+        $("#alarmalert").hide();
+        var today = new Date();
+        $("#dt").val(today.getFullYear()+'/'+(today.getMonth()+1)+'/'+today.getDate());
+        
+        for(i=0;i<settings.alarms.length;i++){
+            if(settings.alarms[i] != null){
+                dayss = settings.alarms[i][1].split('-');
+                daysstext='';
+                for(var j in dayss){
+                    if(dayss[j]!==undefined && dayss[j]!=='')
+                    daysstext += arabicdays[dayss[j]]+' ';
+                }
+                textToInsert = '<tr id="alarmstableentry'+i+'"><td>'+settings.alarms[i][0]+'</td><td>'+daysstext+'</td><td>'+settings.alarms[i][2]+'</td><td><span onclick="deletealarm('+i+')">احذف المنبه</span></td></tr>';
+                $("#alarmstable tr:last").after(textToInsert);
+            }
+            nbalarms++;
+        }
+                    
+
+	prayTimes.setMethod(settings.AthanCalMethod); //MWL, ISNA, Egypt, Makkah, Karachi
+        methods = prayTimes.getDefaults();
+        methodsSelect = '';
+        for (var i in methods) {
+            selected = (i==settings.AthanCalMethod)?'selected="selected"':'';
+            methodsSelect += '<option '+selected+' value="'+i+'">'+methods[i].name+'</option>';
+        }
+         $('#AthanCalMethod').html(methodsSelect);
+         $("#accordion").hide();
+	slat();
+	startTime();
+	startDouaa();
+});
+$( function() {
+    $( "#dt" ).datepicker({
+      /*changeMonth: true,*/
+      changeYear: true,
+      dateFormat:'yy/mm/dd',
+      showButtonPanel: true
+    });
+    $( "#settingstoggle" ).on( "click", function() {
+      if ( $("#accordion").is(':visible') ){
+          $("#accordion").hide();
+      }else{
+        $("#accordion").show( "slow" );
+      }
+      $("html, body").animate({ scrollTop: $("#accordion").scrollTop()+600 }, 1000);
+    });
+    
+  } );
+</script>
+
+</head>
+
+
+<body>
+<div class="content">
+
+<header>
+    مواقيت الصلاة
+</header>
+
+<!-- <div id="currenttime"></div>
+<div id="lguit"></div> -->
+
+<div><span id="futur"><label for="dt">مواقيت الصلاة لتاريخ </label><input type="date" id="dt"></span><label class="button" id="today">&nbsp;&nbsp;&nbsp;اليوم&nbsp;&nbsp;&nbsp;</label><label class="stopsound" id="stopsound"><img src="static/img/mutesoundicon.png" width="50" height="50" /></label><label class="alarmalert" id="alarmalert"></label>
+</div>
+   
+<div class="sun">
+    <div>
+        <div class="asm">نصف الليل</div>
+        <div class="tps" id="midnight">00:00</div>
+     </div>
+    <div class="set">
+        <div id="ghrb">الإفطار/الغروب</div>
+        <div id="gt">00:00</div>
+    </div>
+    <div class="raiz">
+        <div id="sbh">الشروق</div>
+        <div id="st">00:00</div>
+    </div>
+    <div id="sadiq">
+        <div class="asm">الفجر</div>
+        <div class="tps" id="sdq">00:00</div>
+    </div>
+    <!-- <div id="kadhib">
+        <div class="asm">الفجر الكاذب</div>
+        <div class="tps" id="kdb">00:00</div>
+     </div> -->
+</div>
+
+<div class="salat">
+    <div class="temps">
+        <div class="asm">الظهر</div>
+        <div class="tps" id="dhr">00:00</div>
+    </div>
+    
+    <div class="temps">
+        <div class="asm">العصر</div>
+        <div class="tps" id="asr">00:00</div>
+    </div>
+    
+    <div class="temps" id="ftor">
+        <div class="asm">المغرب</div>
+        <div class="tps" id="mgrb">00:00</div>
+    </div>
+    
+    <div class="temps">
+        <div class="asm">العشاء</div>
+        <div class="tps" id="icha">00:00</div>
+    </div>
+    
+</div>
+<h3 id="settingstoggle">الإعدادات</h3>
+<div id="accordion">  
+<form id="settingsform">
+<div class="showsettings">طريقة الحساب: <span>
+        <select class="settingsvalue" id="AthanCalMethod">
+        </select>
+        
+    </span></div>
+<div class="clear"> </div>
+<div class="showsettings">أذكار الصباح: <input class="settingsvalue" id="athkarsabah" name="athkarsabah" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">أذكار المساء: <input class="settingsvalue" id="athkarmasaa" name="athkarmasaa" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">يتكرر الدعاء كل: <input class="settingsvalue" name="douaaperiod" id="douaaperiod" type="text" /> دقيقة</div>
+<div class="clear"> </div>
+<div class="showsettings">خط الطول: <input class="settingsvalue" name="lon" id="lon" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">خط العرض: <input class="settingsvalue" name="lat" id="lat" type="text" /></div>
+<span class="showsettings"><span class="button" id="dar">&nbsp;&nbsp;&nbsp;حدد موقعي&nbsp;&nbsp;&nbsp;</span></span>
+<div class="clear"> </div>
+<div class="showsettings">عدد الأدعية الصوتية: <input class="settingsvalue" name="nbdouaas" id="nbdouaas" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">مستوى صوت الأذان: <input class="settingsvalue" name="athanvolume" id="athanvolume" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">مستوى صوت الدعاء: <input class="settingsvalue" name="douaavolume" id="douaavolume" type="text" /></div>
+<div class="clear"> </div>
+<div class="showsettings">مستوى صوت المنبه: <input class="settingsvalue" name="alarmvolume" id="alarmvolume" type="text" /></div>
+<div class="clear"> </div>
+</form>
+<form id="alarmmangement">
+<div class="showsettings">التنبيهات: </div>
+<div> <input type="time" name="newalarmtime" id="newalarmtime" size="7" placeholder="وقت التنبيه"/>
+<label>الأحد<input type="checkbox" value="0" class="newalarmday" id="newalarmsunday" /></label>
+<label>الأثنين<input type="checkbox" value="1" class="newalarmday" id="newalarmmonday" /></label>
+<label>الثلاثاء<input type="checkbox" value="2" class="newalarmday" id="newalarmtuesday" /></label>
+<label>الأربعاء<input type="checkbox" value="3" class="newalarmday" id="newalarmwednesday" /></label>
+<label>الخميس<input type="checkbox" value="4" class="newalarmday" id="newalarmthursday" /></label>
+<label>الجمعة<input type="checkbox" value="5" class="newalarmday" id="newalarmfriday" /></label>
+<label>السبت<input type="checkbox" value="6" class="newalarmday" id="newalarmsaturday" /></label>
+<input type="text" id="newalarmname" size="17" placeholder="إسم التنبيه" />
+<button id="newalarmsubmit">أضف منبه</button>
+</div>
+<table id="alarmstable" border='1'>
+    <tr>
+        <th>الوقت</th><th>الأيام</th><th>الإسم</th><th></th>
+    </tr>
+    
+</table>
+</form>
+</div>
+</div>
+</body>
+</html>
