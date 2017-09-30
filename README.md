@@ -1,5 +1,5 @@
 # mysalat
-a javascript based page that gives the islamic athan/salat/prayer times
+a HTML/javascript based page that gives the islamic athan/salat/prayer times
 
 # TODO
 convert it to a browser extension
